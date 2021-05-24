@@ -158,7 +158,7 @@
        
 <h2 itemprop="name">
   <a class="article-title" href="/2021/05/23/Comparator/"
-    >Comparator</a> 
+    >Comparator的奇怪报错</a> 
 </h2>
  
 
@@ -173,7 +173,7 @@
       
     <div class="article-entry" itemprop="articleBody">
        
-  <h1 id="Comparator-的奇怪报错"><a href="#Comparator-的奇怪报错" class="headerlink" title="Comparator 的奇怪报错"></a>Comparator 的奇怪报错</h1><p>今天在刷leetcode时，习以为常的使用了老朋友Arrays.sort()来实现逆序排序，：</p>
+  <p>今天在写leetcode1738时，习以为常的使用了老朋友Arrays.sort()来实现降序排序：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Arrays.sort(arr, (o1, o2) -&gt; o1 &gt; o2 ? -<span class="number">1</span> : <span class="number">1</span>);</span><br></pre></td></tr></table></figure>
 
 <p>提交后发现有一个用例报了如下错误：</p>
@@ -187,6 +187,63 @@
 
 <p>虽然我们成功的让报错消失了，但这似乎是一件很恐怖的事，因为我们明知道这个Comparator本身是存在bug的，却没报错，这就像是一个小的定时炸弹，会在我们不经意的时候悄悄炸掉。这么一想，在一开始就出现了 <code>Comparison method violates its general contract!</code>报错反而才是最好的情况。这就告诉我们在编写自定义Comparator时一定要仔细，不可漏掉存在的可能性。</p>
 <p>我在查阅资料时，在YouTube上看到了一个关于这个主题不错的视频，是来自Oracle的Stuark Marks的公开课，他在JDK Group的Core Libraries Team工作，他在Java 的Comparator肯定是很有发言权的了。本文是对Stuark Marks的演讲做一个总结概括，这是一个很有趣的公开课，比如他在视频中提到：“<code>Comparison method violates its general contract!</code>这个报错信息据我所知是唯一一个在末尾用了感叹号的Exception信息，当时写这个的人一定激动坏了。” 我会把原视频的链接放在本文末尾，感兴趣的朋友可以去看一下。</p>
+<h2 id="Comparator必须遵循的Rules"><a href="#Comparator必须遵循的Rules" class="headerlink" title="Comparator必须遵循的Rules"></a>Comparator必须遵循的Rules</h2><blockquote>
+<p>A comparison function, which imposes a <em>total ordering</em> on some collection of objects. Comparators can be passed to a sort method (such as <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/15/docs/api/java.base/java/util/Collections.html#sort(java.util.List,java.util.Comparator)"><code>Collections.sort</code></a> or <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/15/docs/api/java.base/java/util/Arrays.html#sort(T[],java.util.Comparator)"><code>Arrays.sort</code></a>) to allow precise control over the sort order. Comparators can also be used to control the order of certain data structures (such as <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/15/docs/api/java.base/java/util/SortedSet.html"><code>sorted sets</code></a> or <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/15/docs/api/java.base/java/util/SortedMap.html"><code>sorted maps</code></a>), or to provide an ordering for collections of objects that don’t have a <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/15/docs/api/java.base/java/lang/Comparable.html"><code>natural ordering</code></a>.</p>
+</blockquote>
+<p>上述的jdk文档中提到了<strong>全序排列（Total Ordering）</strong>。首先对于任意的a和b，都应满足<strong>三分率（Law of Trichotomy）</strong>：即a和b满足其中一种关系：a &lt; b , a =b, a &gt; b。</p>
+<p>数学中如果一个集合满足了全序关系，那么下列陈述对集合中的元素都成立：</p>
+<ul>
+<li>传递性（Transitivity）：a &lt; b 和 b &lt; c 可以推出 a &lt; c</li>
+<li>反对称性（Antisymmetry）：a &lt; b 可以推出 ~b &lt; a</li>
+<li>可代换性（Substitutability）：a == b 和 a &lt; c 可以推出 b &lt; c</li>
+<li>自反性（Reflexivity）：  如果a == a，那么~a &lt; a</li>
+</ul>
+<p>同样的，在Java中，Interface Comparator<T>也呈现了这种全序关系，它包含了一个方法 <code>int compare(T a, T b)</code>。</p>
+<p>返回值的三分率：</p>
+<ul>
+<li>compare(a, b) &lt; 0：a &lt; b</li>
+<li>compare(a, b) == 0：a == b</li>
+<li>compare(a, b) &gt; 0：a &gt; b</li>
+</ul>
+<p>返回值必须一致：</p>
+<ul>
+<li>给定a和b，多次调用compare(a, b)必须返回相同的值。</li>
+</ul>
+<h2 id="Demo1"><a href="#Demo1" class="headerlink" title="Demo1"></a>Demo1</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> java.util.ArrayList;</span><br><span class="line"><span class="keyword">import</span> java.util.Arrays;</span><br><span class="line"><span class="keyword">import</span> java.util.Comparator;</span><br><span class="line"><span class="keyword">import</span> java.util.List;</span><br><span class="line"><span class="keyword">import</span> java.util.Random;</span><br><span class="line"><span class="keyword">import</span> <span class="keyword">static</span> java.util.stream.Collectors.*;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Demo1</span></span>&#123;	</span><br><span class="line"></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> Comparator&lt;Integer&gt; <span class="title">logging</span><span class="params">(Comparator&lt;Integer&gt; c)</span></span>&#123;</span><br><span class="line">		<span class="keyword">return</span> (a,b) -&gt;&#123;</span><br><span class="line">			<span class="keyword">int</span> r = c.compare(a,b);</span><br><span class="line">			System.err.printf(<span class="string">&quot;%,14d  %,14d,=&gt; %,14d \n&quot;</span>, a,b,r);</span><br><span class="line">			<span class="keyword">return</span> r;</span><br><span class="line">		&#125;;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">		<span class="comment">// Generates a list of 32 random integers. </span></span><br><span class="line">		List&lt;Integer&gt; list = <span class="keyword">new</span> Random(<span class="number">209</span>).ints(<span class="number">32L</span>).boxed().collect(toCollection(ArrayList::<span class="keyword">new</span>));</span><br><span class="line">		list.sort((a, b) -&gt; a - b);</span><br><span class="line">		System.out.println(list);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>运行上述代码会抛出<code>Comparison method violates its general contract!</code>这个异常，我们很难单从异常信息中分析出问题所在，不妨使用<code>logging()</code>函数来打印一下sort函数调用Comparator的过程。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">list.sort(logging((a, b) -&gt; a - b));</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">-1,812,923,685  -1,125,089,413,=&gt;   -687,834,272 //a &lt; b, result &lt; 0</span><br><span class="line">  -659,152,435  -1,812,923,685,=&gt;  1,153,771,250 //a &gt; b, result &gt; 0</span><br><span class="line">  -659,152,435  -1,125,089,413,=&gt;    465,936,978 //a &lt; b, result &gt; 0</span><br><span class="line"> 1,373,845,359  -1,125,089,413,=&gt; -1,796,032,524 //a &gt; b, result &lt; 0 (x)</span><br><span class="line"> 1,373,845,359  -1,812,923,685,=&gt; -1,108,198,252 //a &gt; b, result &lt; 0 (x)</span><br><span class="line"> ... ...</span><br></pre></td></tr></table></figure>
+
+<p>从第四行、第五行我们可以发现，返回值出了问题，应该返回正数才对，却变成了负数。结合我们Comparator写法，我们发现是a - b导致了Integer Overflow。</p>
+<h2 id="Demo2"><a href="#Demo2" class="headerlink" title="Demo2"></a>Demo2</h2><p>让我们换一种写法，不用导致溢出的加减法：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">List&lt;Integer&gt; list = <span class="keyword">new</span> Random(<span class="number">2664</span>).ints(<span class="number">32l</span>, <span class="number">1080</span>, <span class="number">1280</span>).boxed().collect(toCollection(ArrayList::<span class="keyword">new</span>)); </span><br><span class="line">list.sort(logging((a, b) -&gt; a &lt; b ? -<span class="number">1</span> : a == b? <span class="number">0</span> : <span class="number">1</span>));</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">1,093           1,091,=&gt;              1 </span><br><span class="line">1,104           1,093,=&gt;              1 </span><br><span class="line">1,104           1,104,=&gt;              1 //应该是0才对</span><br><span class="line">1,115           1,104,=&gt;              1 </span><br><span class="line">... ...</span><br></pre></td></tr></table></figure>
+
+<p>1104 和 1104是相等的，但返回值却不是0。原因其实就是Integer的自动拆箱，==是<em>Reference Equality</em>，在-128 ~ 127之间，使用的是相同的地址，而超出这个范围，地址便不同了，所以在Comparator中使用==是不正确的。</p>
+<h3 id="可行的写法"><a href="#可行的写法" class="headerlink" title="可行的写法"></a>可行的写法</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">list.sort((a, b) -&gt; a &lt; b ? -<span class="number">1</span> : a &gt; b? <span class="number">1</span> : <span class="number">0</span>);<span class="comment">//替换位置</span></span><br><span class="line">list.sort(Integer::compare);</span><br><span class="line">list.sort(<span class="keyword">null</span>);<span class="comment">//null means &quot;natural order&quot;</span></span><br><span class="line">list.sort(Comparator.naturalOrder());</span><br></pre></td></tr></table></figure>
+
+<h2 id="Demo3"><a href="#Demo3" class="headerlink" title="Demo3"></a>Demo3</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Demo3</span></span>&#123;</span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> Comparator&lt;Double&gt; <span class="title">logging</span><span class="params">(Comparator&lt;Double&gt; c)</span></span>&#123;</span><br><span class="line">		<span class="keyword">return</span> (a,b) -&gt;&#123;</span><br><span class="line">			<span class="keyword">int</span> r = c.compare(a,b);</span><br><span class="line">			System.err.printf(<span class="string">&quot;%7.1f  %7.1f   =&gt;   %2d \n&quot;</span>, a,b,r);</span><br><span class="line">			<span class="keyword">return</span> r;</span><br><span class="line">		&#125;;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">		List&lt;Double&gt; list = <span class="keyword">new</span> Random(<span class="number">284397476</span>).ints(<span class="number">100L</span>).map(Math::abs).mapToDouble(i -&gt; Math.sqrt((<span class="keyword">double</span>)i)).boxed().collect(toCollection(ArrayList::<span class="keyword">new</span>)); </span><br><span class="line">		list.sort(logging((a, b) -&gt; a &lt; b ? -<span class="number">1</span> : a &gt; b? <span class="number">1</span> : <span class="number">0</span>));</span><br><span class="line">		System.out.println(list);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们尝试把集合改成Double类型，异常又出现了，我们再次使用<code>logging</code>函数来查看过程中的值：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">41443.6  40478.5   =&gt;    1 </span><br><span class="line">40478.5  40719.4   =&gt;   -1 </span><br><span class="line">40478.5  40133.5   =&gt;    1 </span><br><span class="line">40133.5      NaN   =&gt;    0 </span><br><span class="line">39406.4      NaN   =&gt;    0 </span><br><span class="line">    NaN  32425.0   =&gt;    0 </span><br><span class="line">    NaN  31205.7   =&gt;    0 </span><br></pre></td></tr></table></figure>
+
+<p>原来是集合中出现了NaN值，NaN是不服从三分率的一个特殊存在，用100和NaN为例，下面这几个陈述对于NaN来说，都是不成立的：</p>
+<ul>
+<li>100 &lt; NaN</li>
+<li>100 &gt; NaN</li>
+<li>100 == NaN</li>
+<li>NaN == NaN</li>
+</ul>
+<h3 id="可行的写法-1"><a href="#可行的写法-1" class="headerlink" title="可行的写法"></a>可行的写法</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//使用isNaN()来判断特殊情况</span></span><br><span class="line"><span class="keyword">if</span>(d.isNaN())&#123;...&#125;</span><br><span class="line"><span class="comment">//会把NaN当成最大的值</span></span><br><span class="line">list.sort(Double::compare);</span><br><span class="line">list.sort(<span class="keyword">null</span>);</span><br><span class="line">list.sort(Comparator.naturalOrder());</span><br></pre></td></tr></table></figure>
+
+<p>—–part 2—-</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><ol>
+<li>不要使用减法来比较int（Overflow）</li>
+<li>使用Integer::Compare、Double::Compare 或者 natural order来排序</li>
+</ol>
  
       <!-- reward -->
       
